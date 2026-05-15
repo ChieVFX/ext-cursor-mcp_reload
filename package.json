@@ -1,0 +1,41 @@
+{
+  "name": "reload",
+  "displayName": "Cursor MCP Reload",
+  "description": "Auto-registers a Cursor MCP tool that reloads Cursor MCP servers.",
+  "version": "0.5.4",
+  "publisher": "mcp",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/evgeniy-skvortsov/cursor-reload-mcps.git"
+  },
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.config.mjs --production",
+    "watch": "node esbuild.config.mjs --watch",
+    "package": "vsce package",
+    "install:cursor": "node scripts/install-cursor.mjs --force",
+    "reinstall": "npm run package && npm run install:cursor"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "@types/vscode": "^1.93.0",
+    "@vscode/vsce": "^3.9.1",
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.3"
+  }
+}

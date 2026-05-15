@@ -1,2 +1,5 @@
 .cursor/
 .vkb/
+node_modules/
+dist/
+*.vsix

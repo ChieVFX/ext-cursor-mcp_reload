@@ -1,0 +1,11 @@
+.cursor/**
+.vkb/**
+.git/**
+.gitignore
+node_modules/**
+src/**
+agent-transcripts/**
+tsconfig.json
+esbuild.config.mjs
+package-lock.json
+*.vsix
