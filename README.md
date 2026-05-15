@@ -18,13 +18,10 @@ Use it when Cursor MCP tool lists are stale after editing or restarting MCP serv
 
 ## Install
 
-Download the VSIX from a GitHub release, then install it in Cursor:
-
 ```sh
-NODE_NO_WARNINGS=1 cursor --install-extension reload-0.5.8.vsix --force
+curl -L -o reload-0.5.8.vsix https://github.com/ChieVFX/ext-cursor-mcp_reload/releases/download/v0.5.8/reload-0.5.8.vsix
+cursor --install-extension reload-0.5.8.vsix --force
 ```
-
-`NODE_NO_WARNINGS=1` only hides Cursor CLI's own Node deprecation warnings.
 
 ## Build Locally
 
