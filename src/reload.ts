@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 
 export const MCP_SERVER_NAME = 'reload-mcps';
-export const EXTENSION_VERSION = '0.5.4';
+export const EXTENSION_VERSION = '0.5.8';
 const MCP_JSON_BOUNCE_GAP_MS = 450;
 
 export type ReloadResult = {
@@ -102,7 +102,7 @@ export async function reloadCursorMcpServers(
     }
     const known = [...servers.keys()].sort();
     throw new Error(targetName
-      ? `[cursor-reload-mcps ${EXTENSION_VERSION}] Cursor MCP "${targetName}" was not found in known MCP configs. Known servers: ${known.length ? known.join(', ') : '(none)'}. Do not retry guessed names and do not reload all. Read resource uri:/mcp_lookup/${encodeLookupPath(targetName)} and use exactName from that JSON, or report matches.`
+      ? `[cursor-reload-mcps ${EXTENSION_VERSION}] Cursor MCP "${targetName}" was not found in known MCP configs. Known servers: ${known.length ? known.join(', ') : '(none)'}. Retry with a more specific serverName or call {} to list available servers.`
       : `[cursor-reload-mcps ${EXTENSION_VERSION}] No reloadable Cursor MCP servers were found in known MCP configs. Empty reload arguments are not allowed; pass reloadAll=true only when user explicitly asks to reload all MCPs.`);
   }
 
@@ -794,10 +794,6 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
 
 function delayMs(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function encodeLookupPath(value: string): string {
-  return encodeURIComponent(value.trim().replace(/\s+/g, '&&'));
 }
 
 function toErrorMessage(error: unknown): string {

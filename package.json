@@ -2,7 +2,7 @@
   "name": "reload",
   "displayName": "Cursor MCP Reload",
   "description": "Auto-registers a Cursor MCP tool that reloads Cursor MCP servers.",
-  "version": "0.5.4",
+  "version": "0.5.8",
   "publisher": "mcp",
   "license": "MIT",
   "repository": {

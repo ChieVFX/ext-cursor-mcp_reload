@@ -1,107 +1,43 @@
-# Cursor Reload MCPs
+# Cursor MCP Reload
 
-Small Cursor extension that auto-registers one MCP server, `reload-mcps`, with one tool:
+Small Cursor extension that auto-registers one MCP server, `reload-mcps`, with one tool, `cursor-reload-mcps`.
 
-```text
-cursor-reload-mcps
-```
+Use it when Cursor MCP tool lists are stale after editing or restarting MCP servers.
 
-Use it when MCP tool lists get stale after editing an MCP server.
+## Behavior
 
-## What It Does
+- `{}` lists available MCP servers and reloads nothing.
+- `{ "serverName": "name-or-unique-part" }` reloads one unique match.
+- `{ "reloadAll": true }` reloads all discovered servers except `reload-mcps`.
+- For "reload only ..." requests, call `serverName` directly; `{}` is list-only.
+- Ambiguous or missing `serverName` reloads nothing and returns plain-text candidates/available servers.
+- Scope is global `~/.cursor/mcp.json`, current workspace `.cursor/mcp.json`, and current workspace Cursor MCP metadata.
+- Stale MCPs from other projects are ignored.
+- Output is plain text, not JSON.
+- No resources, prompts, or elicitation are exposed.
 
-- Registers the `reload-mcps` MCP server on Cursor startup.
-- Provides one MCP tool, also named `cursor-reload-mcps`.
-- Reloads servers from `~/.cursor/mcp.json` and `<workspace>/.cursor/mcp.json`.
-- Reloads extension-registered servers found in the current workspace's Cursor MCP metadata via Cursor internal refresh commands.
-- Accepts project-prefixed Cursor display names such as `project-0-some-project-some-mcp-by-someone` when they end with the configured server name.
-- Accepts Cursor display names with or without repeated `extension-` prefixes.
-- Skips reloading itself from inside its own MCP tool, because that would kill the stdio response channel.
+## Install
 
-## Tool Input
-
-```json
-{
-  "serverName": "optional-server-name",
-  "reloadAll": false
-}
-```
-
-Pass `serverName` to reload one MCP server. Pass `reloadAll: true` to reload every discovered MCP server except `reload-mcps`. Empty `{}` calls are rejected so agents cannot accidentally reload all after a targeted reload fails.
-
-If calling from an agent MCP tool API, use:
-
-- MCP server: the available server whose instructions mention `cursor-reload-mcps` (often displayed as `extension-reload-mcps`; descriptor folders may include `mcp.reload`)
-- Resource lookup before a specific reload: `uri:/mcp_lookup/<query>`; replace spaces with `&&`
-- Tool name: `cursor-reload-mcps`
-- Arguments for all servers: `{ "reloadAll": true }`
-- Arguments for one server: `{ "serverName": "my-local-mcp" }`
-- Empty arguments: returns a plain-text list of available MCP servers and usage
-
-`serverName` can be an exact name or a unique partial name. If more than one MCP matches, the tool refuses to guess and returns candidates.
-For agents, the tool reloads a unique match directly. If the name is ambiguous, no MCP servers are reloaded and candidates are returned.
-Available-server lists are scoped to the current workspace plus global Cursor MCP config; stale MCP metadata from other projects is ignored.
-
-Lookup example:
-
-```text
-uri:/mcp_lookup/my-local
-```
-
-Reload all:
-
-```json
-{
-  "reloadAll": true
-}
-```
-
-Target one server:
-
-```json
-{
-  "serverName": "my-local-mcp"
-}
-```
-
-If a targeted reload fails, do not retry guessed names and do not call reload-all. Run the tool again with a clearer query or report the returned candidates.
-
-## Install From GitHub Release
-
-Download the latest VSIX from the public GitHub release, then install it in Cursor:
+Download the VSIX from a GitHub release, then install it in Cursor:
 
 ```sh
-curl -L -o cursor-reload-mcps.vsix \
-  https://github.com/evgeniy-skvortsov/cursor-reload-mcps/releases/latest/download/cursor-reload-mcps.vsix
-
-cursor --install-extension cursor-reload-mcps.vsix
+NODE_NO_WARNINGS=1 cursor --install-extension reload-0.5.8.vsix --force
 ```
 
-You can also run **Extensions: Install from VSIX...** in Cursor and select the downloaded file.
-
-If Cursor CLI prints Node deprecation warnings during install, suppress them with:
-
-```sh
-NODE_NO_WARNINGS=1 cursor --install-extension cursor-reload-mcps.vsix
-```
+`NODE_NO_WARNINGS=1` only hides Cursor CLI's own Node deprecation warnings.
 
 ## Build Locally
 
 ```sh
 npm install
-npm run build
 npm run package
 npm run install:cursor
 ```
 
-Then install the generated `.vsix` through Cursor.
+Reload the Cursor window after installing so the extension host restarts and re-registers the MCP server.
 
 ## Notes
 
-The extension uses Cursor's runtime MCP API (`vscode.cursor.mcp.registerServer`) and best-effort internal commands (`mcp.toolListChanged`, `mcp.reloadClient`, `mcp.refreshSnapshot`, `mcp.probeAllServers`). These APIs are not documented by Cursor and may change.
+This extension uses Cursor's undocumented runtime MCP API (`vscode.cursor.mcp.registerServer`) plus best-effort internal refresh commands. For `.cursor/mcp.json` servers, it can fall back to briefly removing/restoring the config entry so Cursor restarts that MCP.
 
-For MCP servers declared in `.cursor/mcp.json`, if internal refresh commands do not work, the extension briefly removes and restores the server entry so Cursor restarts the server process.
-
-## License
-
-MIT
+License: MIT

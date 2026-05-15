@@ -8,6 +8,9 @@ const common = {
   minify: production,
   sourcemap: !production,
   logLevel: 'info',
+  loader: {
+    '.md': 'text',
+  },
 };
 
 const builds = [

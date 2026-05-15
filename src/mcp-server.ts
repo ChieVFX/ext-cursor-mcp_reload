@@ -1,15 +1,16 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import mcpInstructions from './mcp-instructions.md';
 
 const TOOL_NAME = 'cursor-reload-mcps';
 const SERVER_NAME = 'reload-mcps';
 const QUEUE_ACTION = 'reload-cursor-mcps';
 const DEFAULT_TIMEOUT_MS = 30_000;
-const EXTENSION_VERSION = '0.5.4';
+const EXTENSION_VERSION = '0.5.8';
 
 const queueDir = process.env.CURSOR_RELOAD_MCPS_QUEUE_DIR || path.join(os.tmpdir(), 'cursor-reload-mcps');
 const requestTimeoutMs = readPositiveInt(process.env.CURSOR_RELOAD_MCPS_REQUEST_TIMEOUT_MS) ?? DEFAULT_TIMEOUT_MS;
@@ -22,35 +23,8 @@ const server = new McpServer(
   {
     capabilities: {
       tools: {},
-      resources: {},
     },
-    instructions: [
-      `MCP tool name: ${TOOL_NAME}.`,
-      'Purpose: ask Cursor extension host to reload MCP server tool lists.',
-      `How to call all servers: call tool "${TOOL_NAME}" with arguments {"reloadAll":true}.`,
-      `How to call one server: call tool "${TOOL_NAME}" with arguments {"serverName":"target-or-partial-mcp-name"}.`,
-      'serverName may be exact or partial. The tool reloads a unique match directly. If ambiguous, it returns candidates and reloads nothing.',
-      'Use the available MCP server whose instructions mention cursor-reload-mcps. Cursor usually displays the server as extension-reload-mcps.',
-      `Descriptor file should be tools/${TOOL_NAME}.json.`,
-      'Do not call this tool with {}. Empty arguments are rejected to prevent accidental reload-all fallback after a targeted request.',
-      'Pass reloadAll=true to reload every discovered MCP except this reload server.',
-      'Pass serverName to search one server from ~/.cursor/mcp.json, workspace .cursor/mcp.json, or Cursor MCP metadata.',
-      'No user input/elicitation is used. Ambiguous matches are safe no-ops with candidate names.',
-    ].join('\n'),
-  },
-);
-
-server.registerResource(
-  'mcp_lookup',
-  new ResourceTemplate('uri:/mcp_lookup/{query}', { list: undefined }),
-  {
-    title: 'MCP Lookup',
-    description: 'Search known Cursor MCP servers by exact name, partial name, or wildcard. Replace spaces in query with &&.',
-    mimeType: 'application/json',
-  },
-  async (uri, variables) => {
-    const query = decodeLookupQuery(decodeUriVariable(variables.query));
-    return jsonResourceResult(uri.toString(), lookupMcpServers(query));
+    instructions: mcpInstructions,
   },
 );
 
@@ -58,18 +32,10 @@ server.registerTool(
   TOOL_NAME,
   {
     title: 'Reload Cursor MCPs',
-    description: [
-      'Reload Cursor MCP server(s) so updated tool lists are picked up.',
-      'Reloads a unique exact/partial serverName directly. Ambiguous matches return candidates and reload nothing. No user input/elicitation is used.',
-      'For servers in .cursor/mcp.json, the extension first tries Cursor internal refresh commands and falls back to briefly removing/restoring the config entry.',
-      'For extension-registered servers found in Cursor MCP metadata, the extension triggers Cursor internal refresh commands by server identifier.',
-      'Pass reloadAll=true to refresh all discovered servers except reload-mcps; empty arguments are rejected.',
-      'serverName may be exact or partial. Project-prefixed Cursor display names are accepted as compatibility when callers already have that identifier.',
-      'The "extension-" prefix Cursor adds to extension-registered MCPs is auto-stripped, so pass either name.',
-    ].join(' '),
+    description: mcpInstructions,
     inputSchema: {
-      serverName: z.string().optional().describe('Cursor MCP server name to reload. For reload-all, omit this and pass reloadAll=true. Empty arguments are rejected.'),
-      reloadAll: z.boolean().optional().describe('Set true to reload every discovered MCP server except this tool server. Required for reload-all; empty arguments are rejected.'),
+      serverName: z.string().optional().describe('Optional name or unique partial name of one MCP server to reload.'),
+      reloadAll: z.boolean().optional().describe('Optional. Set true to reload every discovered MCP server except reload-mcps.'),
     },
   },
   async ({ serverName, reloadAll }) => {
@@ -215,18 +181,6 @@ function plainTextResult(text: string) {
       {
         type: 'text' as const,
         text,
-      },
-    ],
-  };
-}
-
-function jsonResourceResult(uri: string, value: unknown) {
-  return {
-    contents: [
-      {
-        uri,
-        mimeType: 'application/json',
-        text: JSON.stringify(value, null, 2),
       },
     ],
   };
@@ -664,19 +618,6 @@ function dedupeMcpServerMetadata(items: McpServerMetadata[]): McpServerMetadata[
     deduped.push(item);
   }
   return deduped;
-}
-
-function decodeUriVariable(value: string | string[] | undefined): string {
-  const raw = Array.isArray(value) ? value[0] : value;
-  try {
-    return decodeURIComponent(raw ?? '');
-  } catch {
-    return raw ?? '';
-  }
-}
-
-function decodeLookupQuery(value: string): string {
-  return value.replace(/&&/g, ' ').trim();
 }
 
 function encodeLookupQuery(value: string): string {
