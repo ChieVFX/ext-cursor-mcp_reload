@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 
 export const MCP_SERVER_NAME = 'reload-mcps';
-export const EXTENSION_VERSION = '0.5.8';
+export const EXTENSION_VERSION = '0.5.11';
 const MCP_JSON_BOUNCE_GAP_MS = 450;
 
 export type ReloadResult = {

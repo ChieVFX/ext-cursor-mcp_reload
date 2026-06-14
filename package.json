@@ -1,9 +1,11 @@
 {
   "name": "reload",
   "displayName": "Cursor MCP Reload",
-  "description": "Auto-registers a Cursor MCP tool that reloads Cursor MCP servers.",
-  "version": "0.5.8",
-  "publisher": "mcp",
+  "description": "Auto-registers a Cursor MCP tool that reloads Cursor MCP servers; also updates on file '.cursor/reload-mcps.json'.",
+  "version": "0.5.11",
+  "publisher": "chievfx",
+  "author": "Evgeniy Skvortsov",
+  "icon": "icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -15,6 +17,23 @@
   "categories": [
     "Other"
   ],
+  "contributes": {
+    "configuration": {
+      "title": "Cursor MCP Reload",
+      "properties": {
+        "reload.reloadViaFile": {
+          "type": "boolean",
+          "default": true,
+          "description": "Watch .cursor/reload-mcps.json in the workspace and reload MCPs when it appears."
+        },
+        "reload.debugReloadViaFile": {
+          "type": "boolean",
+          "default": false,
+          "description": "Debug: write .cursor/reload-mcps.result.json with success or failure for file reload requests."
+        }
+      }
+    }
+  },
   "activationEvents": [
     "onStartupFinished"
   ],

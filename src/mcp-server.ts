@@ -10,7 +10,7 @@ const TOOL_NAME = 'cursor-reload-mcps';
 const SERVER_NAME = 'reload-mcps';
 const QUEUE_ACTION = 'reload-cursor-mcps';
 const DEFAULT_TIMEOUT_MS = 30_000;
-const EXTENSION_VERSION = '0.5.8';
+const EXTENSION_VERSION = '0.5.11';
 
 const queueDir = process.env.CURSOR_RELOAD_MCPS_QUEUE_DIR || path.join(os.tmpdir(), 'cursor-reload-mcps');
 const requestTimeoutMs = readPositiveInt(process.env.CURSOR_RELOAD_MCPS_REQUEST_TIMEOUT_MS) ?? DEFAULT_TIMEOUT_MS;

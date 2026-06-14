@@ -28,6 +28,11 @@ type QueueResult = {
   error?: string;
 };
 
+type FileReloadRequest = {
+  serverName?: unknown;
+  reloadAll?: unknown;
+};
+
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel('Cursor Reload MCPs');
   context.subscriptions.push(output);
@@ -44,6 +49,12 @@ export function activate(context: vscode.ExtensionContext): void {
     output,
   });
   context.subscriptions.push(processor);
+  context.subscriptions.push(new FileReloadProcessor({
+    queueDir,
+    workspaceRoot,
+    extensionRoot,
+    output,
+  }));
 
   const api = vscode.cursor?.mcp;
   if (!api?.registerServer || !api.unregisterServer) {
@@ -64,6 +75,180 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   // Disposables registered during activation handle cleanup.
+}
+
+class FileReloadProcessor implements vscode.Disposable {
+  private readonly cursorDir: string | undefined;
+  private readonly requestPath: string | undefined;
+  private readonly resultPath: string | undefined;
+  private watcher?: fs.FSWatcher;
+  private configDisposable?: vscode.Disposable;
+  private debounceHandle?: NodeJS.Timeout;
+  private processing = false;
+  private pending = false;
+  private reloadViaFile = false;
+
+  constructor(private readonly options: {
+    queueDir: string;
+    workspaceRoot: string | undefined;
+    extensionRoot: string;
+    output: vscode.OutputChannel;
+  }) {
+    this.cursorDir = options.workspaceRoot ? path.join(options.workspaceRoot, '.cursor') : undefined;
+    this.requestPath = this.cursorDir ? path.join(this.cursorDir, 'reload-mcps.json') : undefined;
+    this.resultPath = this.cursorDir ? path.join(this.cursorDir, 'reload-mcps.result.json') : undefined;
+    this.reloadViaFile = this.readReloadViaFile();
+
+    this.configureWatcher();
+    this.configDisposable = vscode.workspace.onDidChangeConfiguration(event => {
+      if (!event.affectsConfiguration('reload.reloadViaFile')) {
+        return;
+      }
+      this.reloadViaFile = this.readReloadViaFile();
+      if (this.reloadViaFile) {
+        this.scheduleProcess();
+      }
+    });
+    if (this.reloadViaFile) {
+      this.scheduleProcess();
+    }
+  }
+
+  dispose(): void {
+    this.watcher?.close();
+    this.configDisposable?.dispose();
+    if (this.debounceHandle) {
+      clearTimeout(this.debounceHandle);
+      this.debounceHandle = undefined;
+    }
+  }
+
+  private readReloadViaFile(): boolean {
+    return vscode.workspace.getConfiguration('reload').get<boolean>('reloadViaFile', true);
+  }
+
+  private readDebugReloadViaFile(): boolean {
+    return vscode.workspace.getConfiguration('reload').get<boolean>('debugReloadViaFile', false);
+  }
+
+  private configureWatcher(): void {
+    if (!this.cursorDir) {
+      return;
+    }
+
+    try {
+      fs.mkdirSync(this.cursorDir, { recursive: true });
+      this.watcher = fs.watch(this.cursorDir, (_event, fileName) => {
+        if (fileName === 'reload-mcps.json') {
+          this.reloadViaFile = this.readReloadViaFile();
+          if (this.reloadViaFile) {
+            this.scheduleProcess();
+          }
+        }
+      });
+    } catch (error) {
+      this.options.output.appendLine(`Failed to watch file reload marker: ${toErrorMessage(error)}`);
+    }
+  }
+
+  private scheduleProcess(): void {
+    if (this.debounceHandle) {
+      clearTimeout(this.debounceHandle);
+    }
+    this.debounceHandle = setTimeout(() => {
+      this.debounceHandle = undefined;
+      void this.process();
+    }, 250);
+  }
+
+  private async process(): Promise<void> {
+    if (!this.reloadViaFile || !this.requestPath) {
+      return;
+    }
+    if (this.processing) {
+      this.pending = true;
+      return;
+    }
+    if (!fs.existsSync(this.requestPath)) {
+      return;
+    }
+
+    this.processing = true;
+    const startedAt = Date.now();
+    try {
+      const request = this.readRequest(this.requestPath);
+      const serverName = typeof request.serverName === 'string' && request.serverName.trim()
+        ? request.serverName.trim()
+        : undefined;
+      const reloadAll = request.reloadAll === true || (!serverName && request.reloadAll !== false);
+      if (serverName && reloadAll) {
+        throw new Error('Pass either serverName or reloadAll=true, not both.');
+      }
+      if (!serverName && !reloadAll) {
+        throw new Error('Missing serverName. To reload every MCP server, set reloadAll=true or use an empty marker file.');
+      }
+
+      this.options.output.appendLine(serverName
+        ? `File reload request started for "${serverName}".`
+        : 'File reload request started for all discovered MCP servers.');
+
+      const result = await reloadCursorMcpServers(
+        this.options.workspaceRoot,
+        this.options.extensionRoot,
+        this.options.queueDir,
+        serverName,
+        { allowSelf: false },
+      );
+
+      this.writeResult({
+        ok: true,
+        action: 'reload-cursor-mcps',
+        processedAt: new Date().toISOString(),
+        elapsedMs: Date.now() - startedAt,
+        message: result.message,
+        reloaded: result.reloaded,
+      });
+      this.options.output.appendLine(result.message);
+    } catch (error) {
+      const message = toErrorMessage(error);
+      this.writeResult({
+        ok: false,
+        action: 'reload-cursor-mcps',
+        processedAt: new Date().toISOString(),
+        elapsedMs: Date.now() - startedAt,
+        error: message,
+      });
+      this.options.output.appendLine(`File reload request failed: ${message}`);
+    } finally {
+      fs.rmSync(this.requestPath, { force: true });
+      this.processing = false;
+      if (this.pending) {
+        this.pending = false;
+        this.scheduleProcess();
+      }
+    }
+  }
+
+  private readRequest(filePath: string): FileReloadRequest {
+    const raw = fs.readFileSync(filePath, 'utf-8').trim();
+    if (!raw) {
+      return { reloadAll: true };
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isObjectRecord(parsed)) {
+      throw new Error('reload-mcps.json must contain a JSON object.');
+    }
+    return parsed;
+  }
+
+  private writeResult(result: QueueResult): void {
+    if (!this.resultPath || !this.readDebugReloadViaFile()) {
+      return;
+    }
+    const tempPath = `${this.resultPath}.${process.pid}.tmp`;
+    fs.writeFileSync(tempPath, `${JSON.stringify(result, null, 2)}\n`, 'utf-8');
+    fs.renameSync(tempPath, this.resultPath);
+  }
 }
 
 class ReloadQueueProcessor implements vscode.Disposable {

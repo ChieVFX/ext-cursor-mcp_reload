@@ -16,11 +16,21 @@ Use it when Cursor MCP tool lists are stale after editing or restarting MCP serv
 - Output is plain text, not JSON.
 - No resources, prompts, or elicitation are exposed.
 
+## File Reload
+
+Enabled by default: `reload.reloadViaFile`.
+
+The extension watches the current workspace for `.cursor/reload-mcps.json`. Creating that file triggers a reload and consumes the file. Empty file or `{ "reloadAll": true }` reloads all discovered MCP servers except `reload-mcps`; `{ "serverName": "name-or-unique-part" }` reloads one server.
+
+Optional debug output, default off: enable `reload.debugReloadViaFile` to write `.cursor/reload-mcps.result.json` for both success and failure.
+
+This is intended for external tools such as Unity editor extensions. They can write the marker without requiring Cursor, this extension, or the MCP server to be running.
+
 ## Install
 
 ```sh
-curl -L -o reload-0.5.8.vsix https://github.com/ChieVFX/ext-cursor-mcp_reload/releases/download/v0.5.8/reload-0.5.8.vsix
-cursor --install-extension reload-0.5.8.vsix --force
+curl -L -o reload-0.5.11.vsix https://github.com/ChieVFX/ext-cursor-mcp_reload/releases/download/v0.5.11/reload-0.5.11.vsix
+cursor --install-extension reload-0.5.11.vsix --force
 ```
 
 ## Build Locally
