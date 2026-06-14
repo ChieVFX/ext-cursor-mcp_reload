@@ -20,11 +20,36 @@ Use it when Cursor MCP tool lists are stale after editing or restarting MCP serv
 
 Enabled by default: `reload.reloadViaFile`.
 
-The extension watches the current workspace for `.cursor/reload-mcps.json`. Creating that file triggers a reload and consumes the file. Empty file or `{ "reloadAll": true }` reloads all discovered MCP servers except `reload-mcps`; `{ "serverName": "name-or-unique-part" }` reloads one server.
+The extension watches the current workspace for `.cursor/reload-mcps.json`. Creating that file triggers a reload and consumes the file. This is intended for external tools such as Unity editor extensions: they can write the marker without requiring Cursor, this extension, or the MCP server to be running. If Cursor opens the project later, the marker is picked up on extension activation.
+
+Request examples:
+
+```json
+{ "reloadAll": true }
+```
+
+```json
+{ "serverName": "unity-369f57df" }
+```
+
+Empty file means `{ "reloadAll": true }`. Passing both `serverName` and `reloadAll` is rejected. Passing `{ "reloadAll": false }` without `serverName` is rejected.
 
 Optional debug output, default off: enable `reload.debugReloadViaFile` to write `.cursor/reload-mcps.result.json` for both success and failure.
 
-This is intended for external tools such as Unity editor extensions. They can write the marker without requiring Cursor, this extension, or the MCP server to be running.
+Debug result shape:
+
+```json
+{
+  "ok": true,
+  "action": "reload-cursor-mcps",
+  "processedAt": "2026-06-14T15:00:00.000Z",
+  "elapsedMs": 123,
+  "message": "Reloaded Cursor MCP server: unity-369f57df.",
+  "reloaded": ["unity-369f57df"]
+}
+```
+
+Failure result uses `"ok": false` and an `"error"` string.
 
 ## Install
 
