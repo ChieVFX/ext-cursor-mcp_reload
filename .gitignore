@@ -1,5 +1,6 @@
 .cursor/
-.vkb/
+.vkb/*
+!.vkb/memory/
 node_modules/
 dist/
 *.vsix
