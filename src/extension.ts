@@ -245,9 +245,7 @@ class FileReloadProcessor implements vscode.Disposable {
     if (!this.resultPath || !this.readDebugReloadViaFile()) {
       return;
     }
-    const tempPath = `${this.resultPath}.${process.pid}.tmp`;
-    fs.writeFileSync(tempPath, `${JSON.stringify(result, null, 2)}\n`, 'utf-8');
-    fs.renameSync(tempPath, this.resultPath);
+    atomicWriteFileSync(this.resultPath, `${JSON.stringify(result, null, 2)}\n`);
   }
 }
 
@@ -342,10 +340,16 @@ class ReloadQueueProcessor implements vscode.Disposable {
   }
 
   private async processFile(filePath: string): Promise<boolean> {
+    const claimedPath = claimQueueFile(filePath);
+    if (!claimedPath) {
+      return false;
+    }
+
     const requestFile = path.basename(filePath);
     const startedAt = Date.now();
-    const request = this.readRequest(filePath);
+    const request = this.readRequest(claimedPath);
     if (!request) {
+      fs.rmSync(claimedPath, { force: true });
       this.scheduleRetry();
       return false;
     }
@@ -388,7 +392,6 @@ class ReloadQueueProcessor implements vscode.Disposable {
         reloaded: result.reloaded,
       });
       this.options.output.appendLine(result.message);
-      fs.rmSync(filePath, { force: true });
       return true;
     } catch (error) {
       const message = toErrorMessage(error);
@@ -400,8 +403,9 @@ class ReloadQueueProcessor implements vscode.Disposable {
         error: message,
       });
       this.options.output.appendLine(`Reload request failed: ${message}`);
-      fs.rmSync(filePath, { force: true });
       return true;
+    } finally {
+      fs.rmSync(claimedPath, { force: true });
     }
   }
 
@@ -416,9 +420,7 @@ class ReloadQueueProcessor implements vscode.Disposable {
 
   private writeResult(requestFile: string, result: QueueResult): void {
     const resultPath = path.join(this.resultsDir, requestFile);
-    const tempPath = `${resultPath}.${process.pid}.tmp`;
-    fs.writeFileSync(tempPath, JSON.stringify(result), 'utf-8');
-    fs.renameSync(tempPath, resultPath);
+    atomicWriteFileSync(resultPath, JSON.stringify(result));
   }
 
   private scheduleRetry(): void {
@@ -429,6 +431,73 @@ class ReloadQueueProcessor implements vscode.Disposable {
       this.retryHandle = undefined;
       this.scheduleProcess();
     }, 250);
+  }
+}
+
+function claimQueueFile(filePath: string): string | undefined {
+  const claimedPath = `${filePath}.processing`;
+  try {
+    fs.renameSync(filePath, claimedPath);
+    return claimedPath;
+  } catch {
+    return undefined;
+  }
+}
+
+function atomicWriteFileSync(filePath: string, content: string, maxAttempts = 6): void {
+  const dir = path.dirname(filePath);
+  const tempPath = path.join(dir, `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`);
+  fs.writeFileSync(tempPath, content, 'utf-8');
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      if (attempt > 0) {
+        sleepSync(25 * attempt);
+      }
+      fs.renameSync(tempPath, filePath);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!isRetriableWriteError(error)) {
+        break;
+      }
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.rmSync(filePath, { force: true });
+        }
+      } catch {
+        // Retry after a short delay; another host or AV may still hold the file.
+      }
+    }
+  }
+
+  try {
+    fs.copyFileSync(tempPath, filePath);
+    fs.rmSync(tempPath, { force: true });
+    return;
+  } catch (error) {
+    try {
+      fs.rmSync(tempPath, { force: true });
+    } catch {
+      // Best effort temp cleanup.
+    }
+    throw lastError ?? error;
+  }
+}
+
+function isRetriableWriteError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === 'EPERM' || code === 'EACCES' || code === 'EBUSY' || code === 'EEXIST';
+}
+
+function sleepSync(ms: number): void {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    // Busy wait keeps queue writes synchronous without pulling in async helpers.
   }
 }
 

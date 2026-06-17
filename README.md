@@ -53,10 +53,12 @@ Failure result uses `"ok": false` and an `"error"` string.
 
 ## Install
 
-```sh
-curl -L -o reload-0.5.11.vsix https://github.com/ChieVFX/ext-cursor-mcp_reload/releases/download/v0.5.11/reload-0.5.11.vsix
-cursor --install-extension reload-0.5.11.vsix --force
-```
+1. Download the latest `.vsix` from [GitHub Releases](https://github.com/ChieVFX/ext-cursor-mcp_reload/releases).
+2. Install it in Cursor:
+   - **UI:** Command Palette → `Extensions: Install from VSIX...` → pick the downloaded file.
+   - **CLI:** `cursor --install-extension path/to/reload-*.vsix`
+
+Reload the Cursor window after installing so the extension host restarts and re-registers the MCP server.
 
 ## Build Locally
 
